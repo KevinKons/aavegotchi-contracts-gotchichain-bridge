@@ -1,6 +1,6 @@
 /* global ethers hre */
 
-import { ethers, run } from "hardhat";
+import { ethers } from "hardhat";
 import { deployAndUpgradeWearableDiamond } from "./upgrades/upgrade-deployWearableDiamond";
 import { getAllItemTypes, SleeveObject } from "./itemTypeHelpers";
 import { itemTypes as allItemTypes } from "../data/itemTypes/itemTypes";
@@ -129,6 +129,7 @@ async function main() {
   }
   let [
     bridgeFacet,
+    polygonXGotchichainBridgeFacet,
     aavegotchiFacet,
     aavegotchiGameFacet,
     svgFacet,
@@ -152,6 +153,7 @@ async function main() {
     merkleDropFacet,
   ] = await deployFacets(
     "contracts/Aavegotchi/facets/BridgeFacet.sol:BridgeFacet",
+    "contracts/Aavegotchi/facets/PolygonXGotchichainBridgeFacet.sol:PolygonXGotchichainBridgeFacet",
     "contracts/Aavegotchi/facets/AavegotchiFacet.sol:AavegotchiFacet",
     "AavegotchiGameFacet",
     "SvgFacet",
@@ -181,6 +183,7 @@ async function main() {
     initDiamond: "contracts/Aavegotchi/InitDiamond.sol:InitDiamond",
     facets: [
       ["BridgeFacet", bridgeFacet],
+      ["PolygonXGotchichainBridgeFacet", polygonXGotchichainBridgeFacet],
       ["AavegotchiFacet", aavegotchiFacet],
       ["AavegotchiGameFacet", aavegotchiGameFacet],
       ["SvgFacet", svgFacet],
