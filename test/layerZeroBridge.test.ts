@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { AavegotchiFacet, DAOFacet, ERC20MintableBurnable, ShopFacet, SvgFacet } from "../typechain";
+import { AavegotchiFacet, BridgeGotchichainSide, BridgePolygonSide, DAOFacet, ERC20MintableBurnable, PolygonXGotchichainBridgeFacet, ShopFacet, SvgFacet } from "../typechain";
 const LZEndpointMockCompiled = require("@layerzerolabs/solidity-examples/artifacts/contracts/mocks/LZEndpointMock.sol/LZEndpointMock.json")
 const diamond = require("../js/diamond-util/src/index.js");
 
@@ -12,75 +12,63 @@ describe("Bridge ERC721: ", function () {
   const batchSizeLimit = 1
   const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 350000])
 
-  let LZEndpointMock: any, BridgePolygonSide, BridgeGotchichainSide
+  let LZEndpointMock: any, bridgePolygonSide: BridgePolygonSide, bridgeGotchichainSide: BridgeGotchichainSide
   let owner: SignerWithAddress, alice: SignerWithAddress
-  let lzEndpointMockA, lzEndpointMockB, shopFacetPolygonSide: ShopFacet, shopFacetGotchichainSide: ShopFacet, aavegotchiFacetPolygonSide: AavegotchiFacet, aavegotchiFacetGotchichainSide: AavegotchiFacet
+  let lzEndpointMockA, lzEndpointMockB
+  let shopFacetPolygonSide: ShopFacet, shopFacetGotchichainSide: ShopFacet
+  let aavegotchiFacetPolygonSide: AavegotchiFacet, aavegotchiFacetGotchichainSide: AavegotchiFacet
+  let bridgeFacetPolygonSide: PolygonXGotchichainBridgeFacet, bridgeFacetGotchichainSide: PolygonXGotchichainBridgeFacet
   
 
   beforeEach(async function () {
     owner = (await ethers.getSigners())[0];
     alice = (await ethers.getSigners())[1];
 
-    ;({ shopFacet: shopFacetPolygonSide, aavegotchiFacet: aavegotchiFacetPolygonSide } = await deployAavegotchiContracts(owner.address))
+    ;({ shopFacet: shopFacetPolygonSide, aavegotchiFacet: aavegotchiFacetPolygonSide, polygonXGotchichainBridgeFacet: bridgeFacetPolygonSide } = await deployAavegotchiContracts(owner.address))
     ;({ shopFacet: shopFacetGotchichainSide, aavegotchiFacet: aavegotchiFacetGotchichainSide } = await deployAavegotchiContracts(owner.address))
 
     LZEndpointMock = await ethers.getContractFactory(LZEndpointMockCompiled.abi, LZEndpointMockCompiled.bytecode)
-    BridgePolygonSide = await ethers.getContractFactory("BridgePolygonSide");
-    BridgeGotchichainSide = await ethers.getContractFactory("BridgeGotchichainSide");
+    const BridgePolygonSide = await ethers.getContractFactory("BridgePolygonSide");
+    const BridgeGotchichainSide = await ethers.getContractFactory("BridgeGotchichainSide");
 
     //Deploying LZEndpointMock contracts
     lzEndpointMockA = await LZEndpointMock.deploy(chainId_A)
     lzEndpointMockB = await LZEndpointMock.deploy(chainId_B)
 
     //Deploying bridge contracts
-    BridgePolygonSide = await BridgePolygonSide.deploy(minGasToStore, lzEndpointMockA.address, aavegotchiFacetPolygonSide.address)
-    BridgeGotchichainSide = await BridgeGotchichainSide.deploy(minGasToStore, lzEndpointMockB.address, aavegotchiFacetGotchichainSide.address)
+    bridgePolygonSide = await BridgePolygonSide.deploy(minGasToStore, lzEndpointMockA.address, aavegotchiFacetPolygonSide.address)
+    bridgeGotchichainSide = await BridgeGotchichainSide.deploy(minGasToStore, lzEndpointMockB.address, aavegotchiFacetGotchichainSide.address)
 
     //Wire the lz endpoints to guide msgs back and forth
-    lzEndpointMockA.setDestLzEndpoint(BridgeGotchichainSide.address, lzEndpointMockB.address)
-    lzEndpointMockB.setDestLzEndpoint(BridgePolygonSide.address, lzEndpointMockA.address)
+    lzEndpointMockA.setDestLzEndpoint(bridgeGotchichainSide.address, lzEndpointMockB.address)
+    lzEndpointMockB.setDestLzEndpoint(bridgePolygonSide.address, lzEndpointMockA.address)
 
     //Set each contracts source address so it can send to each other
-    await BridgePolygonSide.setTrustedRemote(chainId_B, ethers.utils.solidityPack(["address", "address"], [BridgeGotchichainSide.address, BridgePolygonSide.address]))
-    await BridgeGotchichainSide.setTrustedRemote(chainId_A, ethers.utils.solidityPack(["address", "address"], [BridgePolygonSide.address, BridgeGotchichainSide.address]))
+    await bridgePolygonSide.setTrustedRemote(chainId_B, ethers.utils.solidityPack(["address", "address"], [bridgeGotchichainSide.address, bridgePolygonSide.address]))
+    await bridgeGotchichainSide.setTrustedRemote(chainId_A, ethers.utils.solidityPack(["address", "address"], [bridgePolygonSide.address, bridgeGotchichainSide.address]))
 
     //Set batch size limit
-    await BridgePolygonSide.setDstChainIdToBatchLimit(chainId_B, batchSizeLimit)
-    await BridgeGotchichainSide.setDstChainIdToBatchLimit(chainId_A, batchSizeLimit)
+    await bridgePolygonSide.setDstChainIdToBatchLimit(chainId_B, batchSizeLimit)
+    await bridgeGotchichainSide.setDstChainIdToBatchLimit(chainId_A, batchSizeLimit)
 
     //set min dst gas for swap
-    await BridgePolygonSide.setMinDstGas(chainId_B, 1, 150000)
-    await BridgeGotchichainSide.setMinDstGas(chainId_A, 1, 150000)
+    await bridgePolygonSide.setMinDstGas(chainId_B, 1, 150000)
+    await bridgeGotchichainSide.setMinDstGas(chainId_A, 1, 150000)
   })
 
   it("ShopFacet - mintPortals() - Should mint portal", async function () {
+    const tokenId = 0
+
     await shopFacetPolygonSide.mintPortals(owner.address, 1)
+    await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
+    
+    //Estimate nativeFees
+    // let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
 
-    let gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(0)
-    console.log({gotchiOwner})
-
-    await aavegotchiFacetPolygonSide.transferFrom(owner.address, alice.address, 0)
-
-    gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(0)
-    console.log({gotchiOwner})
+    // let gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)
+    // gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)
   })
 })
-
-function addCommas(nStr) {
-  nStr += "";
-  const x = nStr.split(".");
-  let x1 = x[0];
-  const x2 = x.length > 1 ? "." + x[1] : "";
-  var rgx = /(\d+)(\d{3})/;
-  while (rgx.test(x1)) {
-    x1 = x1.replace(rgx, "$1" + "," + "$2");
-  }
-  return x1 + x2;
-}
-
-function strDisplay(str) {
-  return addCommas(str.toString());
-}
 
 async function deployAavegotchiContracts(ownerAddress: string) {
 
@@ -104,7 +92,6 @@ async function deployAavegotchiContracts(ownerAddress: string) {
     await ethers.getContractFactory("ERC20MintableBurnable")
   ).deploy()) as ERC20MintableBurnable;
   const ghstDiamondAddress = ghstTokenContract.address;
-  console.log("GHST address:" + ghstDiamondAddress);
 
   async function deployFacets(...facets: any[]) {
     const instances = [];
@@ -117,8 +104,7 @@ async function deployAavegotchiContracts(ownerAddress: string) {
       const facetInstance = await factory.deploy(...constructorArgs);
       await facetInstance.deployed();
       const tx = facetInstance.deployTransaction;
-      const receipt = await tx.wait();
-      console.log(`${facet} deploy gas used:` + strDisplay(receipt.gasUsed));
+      await tx.wait();
       instances.push(facetInstance);
     }
     return instances;
@@ -220,7 +206,6 @@ async function deployAavegotchiContracts(ownerAddress: string) {
       ],
     ],
   });
-  console.log("Aavegotchi diamond address:" + aavegotchiDiamond.address);
 
   let totalGasUsed = ethers.BigNumber.from("0");
   let tx;
@@ -238,11 +223,13 @@ async function deployAavegotchiContracts(ownerAddress: string) {
     "contracts/Aavegotchi/facets/AavegotchiFacet.sol:AavegotchiFacet",
     aavegotchiDiamond.address
   );
+  polygonXGotchichainBridgeFacet = await ethers.getContractAt(
+    "PolygonXGotchichainBridgeFacet",
+    aavegotchiDiamond.address
+  );
 
   // add item managers
-  console.log("Adding item managers");
   tx = await daoFacet.addItemManagers(itemManagers, { gasLimit: gasLimit });
-  console.log("Adding item managers tx:", tx.hash);
   receipt = await tx.wait();
   if (!receipt.status) {
     throw Error(`Adding item manager failed: ${tx.hash}`);
@@ -255,11 +242,11 @@ async function deployAavegotchiContracts(ownerAddress: string) {
     gasLimit: gasLimit,
   });
   receipt = await tx.wait();
-  console.log("Haunt created:" + strDisplay(receipt.gasUsed));
   totalGasUsed = totalGasUsed.add(receipt.gasUsed);
 
   return {
     shopFacet,
     aavegotchiFacet,
+    polygonXGotchichainBridgeFacet
   }
 }
