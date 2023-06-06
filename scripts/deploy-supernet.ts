@@ -235,6 +235,22 @@ async function main() {
 
   // get facets
   daoFacet = await ethers.getContractAt("DAOFacet", aavegotchiDiamond.address);
+  itemsFacet = await ethers.getContractAt(
+    "contracts/Aavegotchi/facets/ItemsFacet.sol:ItemsFacet",
+    aavegotchiDiamond.address
+  );
+  polygonXGotchichainBridgeFacet = await ethers.getContractAt(
+    "PolygonXGotchichainBridgeFacet",
+    aavegotchiDiamond.address
+  );
+  shopFacet = await ethers.getContractAt(
+    "ShopFacet",
+    aavegotchiDiamond.address
+  );
+  aavegotchiFacet = await ethers.getContractAt(
+    "contracts/Aavegotchi/facets/AavegotchiFacet.sol:AavegotchiFacet",
+    aavegotchiDiamond.address
+  );
   aavegotchiGameFacet = await ethers.getContractAt(
     "AavegotchiGameFacet",
     aavegotchiDiamond.address
@@ -600,6 +616,26 @@ async function main() {
   // // }
 
   console.log("Total gas used: " + strDisplay(totalGasUsed));
+
+  tx = await shopFacet.mintPortals(ownerAddress, 1)
+  await tx.wait()
+
+  tx = await ghstTokenContract.mint(ownerAddress, ethers.utils.parseEther('10000000'))
+  await tx.wait()
+
+  tx = await ghstTokenContract.approve(shopFacet.address, ethers.utils.parseEther('10000000'))
+  
+  tx = await shopFacet.purchaseItemsWithGhst(ownerAddress, [1], [1])
+  await tx.wait()
+  
+  tx = await itemsFacet.equipWearables(0, [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+  await tx.wait()
+
+  console.log('equippedWearables id 0', await itemsFacet.equippedWearables(0))
+
+  // console.log('balanceOf of item 0', await itemsFacet.balanceOf(ownerAddress, 1))
+
+  console.log('aavegotchi 0', await polygonXGotchichainBridgeFacet.getAavegotchiData(0))
 }
 
 // We recommend this pattern to be able to use async/await everywhere

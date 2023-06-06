@@ -48,7 +48,6 @@ export default {
       blockGasLimit: 20000000,
       timeout: 120000,
       gas: "auto",
-     
     },
     // localhost: {
     //   timeout: 16000000,
