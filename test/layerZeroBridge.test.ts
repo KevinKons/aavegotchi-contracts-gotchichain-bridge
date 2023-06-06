@@ -10,11 +10,11 @@ describe("Bridge ERC721: ", function () {
   const chainId_B = 2
   const minGasToStore = 200000
   const batchSizeLimit = 1
-  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 350000])
+  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 100850000])
 
   let LZEndpointMock: any, bridgePolygonSide: BridgePolygonSide, bridgeGotchichainSide: BridgeGotchichainSide
   let owner: SignerWithAddress, alice: SignerWithAddress
-  let lzEndpointMockA, lzEndpointMockB
+  let lzEndpointMockA: any, lzEndpointMockB: any
   let shopFacetPolygonSide: ShopFacet, shopFacetGotchichainSide: ShopFacet
   let aavegotchiFacetPolygonSide: AavegotchiFacet, aavegotchiFacetGotchichainSide: AavegotchiFacet
   let bridgeFacetPolygonSide: PolygonXGotchichainBridgeFacet, bridgeFacetGotchichainSide: PolygonXGotchichainBridgeFacet
@@ -25,7 +25,7 @@ describe("Bridge ERC721: ", function () {
     alice = (await ethers.getSigners())[1];
 
     ;({ shopFacet: shopFacetPolygonSide, aavegotchiFacet: aavegotchiFacetPolygonSide, polygonXGotchichainBridgeFacet: bridgeFacetPolygonSide } = await deployAavegotchiContracts(owner.address))
-    ;({ shopFacet: shopFacetGotchichainSide, aavegotchiFacet: aavegotchiFacetGotchichainSide } = await deployAavegotchiContracts(owner.address))
+    ;({ shopFacet: shopFacetGotchichainSide, aavegotchiFacet: aavegotchiFacetGotchichainSide, polygonXGotchichainBridgeFacet: bridgeFacetGotchichainSide } = await deployAavegotchiContracts(owner.address))
 
     LZEndpointMock = await ethers.getContractFactory(LZEndpointMockCompiled.abi, LZEndpointMockCompiled.bytecode)
     const BridgePolygonSide = await ethers.getContractFactory("BridgePolygonSide");
@@ -51,9 +51,13 @@ describe("Bridge ERC721: ", function () {
     await bridgePolygonSide.setDstChainIdToBatchLimit(chainId_B, batchSizeLimit)
     await bridgeGotchichainSide.setDstChainIdToBatchLimit(chainId_A, batchSizeLimit)
 
-    //set min dst gas for swap
+    //Set min dst gas for swap
     await bridgePolygonSide.setMinDstGas(chainId_B, 1, 150000)
     await bridgeGotchichainSide.setMinDstGas(chainId_A, 1, 150000)
+
+    //Set layer zero bridge on facet
+    await bridgeFacetPolygonSide.setLayerZeroBridge(bridgePolygonSide.address)
+    await bridgeFacetGotchichainSide.setLayerZeroBridge(bridgeGotchichainSide.address)
   })
 
   it("ShopFacet - mintPortals() - Should mint portal", async function () {
@@ -63,7 +67,26 @@ describe("Bridge ERC721: ", function () {
     await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
     
     //Estimate nativeFees
-    // let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
+    let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
+
+    //Swaps token to other chain
+    const sendFromTx = await bridgePolygonSide.sendFrom(
+      owner.address,
+      chainId_B,
+      owner.address,
+      tokenId,
+      owner.address,
+      ethers.constants.AddressZero,
+      defaultAdapterParams,
+      { value: nativeFee }
+    )
+    await sendFromTx.wait()
+
+    //Token is now owned by the proxy contract, because this is the original nft chain
+    expect(await aavegotchiFacetPolygonSide.ownerOf(tokenId)).to.equal(bridgePolygonSide.address)
+
+    //Token received on the dst chain
+    expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.be.equal(owner.address)
 
     // let gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)
     // gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)

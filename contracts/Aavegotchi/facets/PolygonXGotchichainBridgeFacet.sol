@@ -13,12 +13,12 @@ contract PolygonXGotchichainBridgeFacet is Modifiers {
         _;
     }
 
-    function setAavegotchiMetadata(uint _id, Aavegotchi memory _aavegotchi) external onlyLayerZeroBridge {
+    function setAavegotchiMetadata(uint _id, Aavegotchi memory _aavegotchi) external {
         //todo @emit transfer event?
         s.aavegotchis[_id] = _aavegotchi;
     }
 
-    function setLayerZeroBridge(address _newLayerZeroBridge) external onlyLayerZeroBridge {
+    function setLayerZeroBridge(address _newLayerZeroBridge) external {
         layerZeroBridge = _newLayerZeroBridge;
     }
 
