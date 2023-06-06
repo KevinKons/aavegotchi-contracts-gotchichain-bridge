@@ -10,7 +10,7 @@ describe("Bridge ERC721: ", function () {
   const chainId_B = 2
   const minGasToStore = 200000
   const batchSizeLimit = 1
-  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 100850000])
+  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 350000])
 
   let LZEndpointMock: any, bridgePolygonSide: BridgePolygonSide, bridgeGotchichainSide: BridgeGotchichainSide
   let owner: SignerWithAddress, alice: SignerWithAddress
