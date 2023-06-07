@@ -1,11 +1,15 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { AavegotchiFacet, BridgeGotchichainSide, BridgePolygonSide, DAOFacet, ERC20MintableBurnable, PolygonXGotchichainBridgeFacet, ShopFacet, SvgFacet } from "../typechain";
+import { AavegotchiFacet, BridgeGotchichainSide, BridgePolygonSide, DAOFacet, ERC20MintableBurnable, ItemsFacet, PolygonXGotchichainBridgeFacet, ShopFacet, SvgFacet } from "../typechain";
+import { getAllItemTypes, SleeveObject } from "../scripts/itemTypeHelpers";
+import { itemTypes as allItemTypes } from "../data/itemTypes/itemTypes";
+import { wearableSets } from "../scripts/wearableSets";
 const LZEndpointMockCompiled = require("@layerzerolabs/solidity-examples/artifacts/contracts/mocks/LZEndpointMock.sol/LZEndpointMock.json")
 const diamond = require("../js/diamond-util/src/index.js");
 import { deployAndUpgradeWearableDiamond } from "../scripts/upgrades/upgrade-deployWearableDiamond";
-
+import { deployAndUpgradeForgeDiamond } from "../scripts/upgrades/forge/upgrade-deployAndUpgradeForgeDiamond";
+import { setForgeProperties } from "../scripts/upgrades/forge/upgrade-forgeSetters";
 
 describe("Bridge ERC721: ", function () {
   const chainId_A = 1
@@ -19,15 +23,16 @@ describe("Bridge ERC721: ", function () {
   let lzEndpointMockA: any, lzEndpointMockB: any
   let shopFacetPolygonSide: ShopFacet, shopFacetGotchichainSide: ShopFacet
   let aavegotchiFacetPolygonSide: AavegotchiFacet, aavegotchiFacetGotchichainSide: AavegotchiFacet
+  let itemsFacetPolygonSide: ItemsFacet, itemsFacetGotchichainSide: ItemsFacet
+  let ghstTokenPolygonSide: ERC20MintableBurnable, ghstTokenGotchichainSide: ERC20MintableBurnable
   let bridgeFacetPolygonSide: PolygonXGotchichainBridgeFacet, bridgeFacetGotchichainSide: PolygonXGotchichainBridgeFacet
-
 
   beforeEach(async function () {
     owner = (await ethers.getSigners())[0];
     alice = (await ethers.getSigners())[1];
 
-    ; ({ shopFacet: shopFacetPolygonSide, aavegotchiFacet: aavegotchiFacetPolygonSide, polygonXGotchichainBridgeFacet: bridgeFacetPolygonSide } = await deployAavegotchiContracts(owner.address))
-      ; ({ shopFacet: shopFacetGotchichainSide, aavegotchiFacet: aavegotchiFacetGotchichainSide, polygonXGotchichainBridgeFacet: bridgeFacetGotchichainSide } = await deployAavegotchiContracts(owner.address))
+    ; ({ shopFacet: shopFacetPolygonSide, aavegotchiFacet: aavegotchiFacetPolygonSide, polygonXGotchichainBridgeFacet: bridgeFacetPolygonSide, itemsFacet: itemsFacetPolygonSide, ghstToken: ghstTokenPolygonSide } = await deployAavegotchiContracts(owner.address))
+      ; ({ shopFacet: shopFacetGotchichainSide, aavegotchiFacet: aavegotchiFacetGotchichainSide, polygonXGotchichainBridgeFacet: bridgeFacetGotchichainSide, itemsFacet: itemsFacetGotchichainSide, ghstToken: ghstTokenGotchichainSide } = await deployAavegotchiContracts(owner.address))
 
     LZEndpointMock = await ethers.getContractFactory(LZEndpointMockCompiled.abi, LZEndpointMockCompiled.bytecode)
     const BridgePolygonSide = await ethers.getContractFactory("BridgePolygonSide");
@@ -63,10 +68,7 @@ describe("Bridge ERC721: ", function () {
   })
 
   it("ShopFacet - mintPortals() - Should mint portal", async function () {
-    const tokenId = 0
-
-    await shopFacetPolygonSide.mintPortals(owner.address, 1)
-    await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
+    const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
     let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
@@ -90,15 +92,45 @@ describe("Bridge ERC721: ", function () {
     //Token received on the dst chain
     expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.be.equal(owner.address)
 
-    // let gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)
-    // gotchiOwner = await aavegotchiFacetPolygonSide.ownerOf(tokenId)
+    const aavegotchiData = await bridgeFacetGotchichainSide.getAavegotchiData(tokenId)
+    console.log({aavegotchiData})
   })
+
+  async function mintPortals(to: string) {
+    let tx = await shopFacetPolygonSide.mintPortals(to, 1)
+    let receipt: any = await tx.wait()
+
+    const tokenId = receipt.events[0].args._tokenId.toString()
+
+    await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
+
+    tx = await ghstTokenPolygonSide.mint(owner.address, ethers.utils.parseEther('100000000000000000000000'))
+    await tx.wait()
+
+    tx = await ghstTokenPolygonSide.approve(shopFacetPolygonSide.address, ethers.utils.parseEther('100000000000000000000000'))
+
+    tx = await shopFacetPolygonSide.purchaseItemsWithGhst(owner.address, [1], [1])
+    await tx.wait()
+
+    tx = await itemsFacetPolygonSide.equipWearables(0, [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    await tx.wait()
+
+    return tokenId
+  }
 })
+
 
 async function deployAavegotchiContracts(ownerAddress: string) {
 
   const name = "Aavegotchi";
   const symbol = "GOTCHI";
+
+  const realmDiamondAddress = ethers.constants.AddressZero; //todo
+  const fakeGotchiArtDiamondAddress = ethers.constants.AddressZero
+  const ghstStakingDiamondAddress = ethers.constants.AddressZero
+  const installationDiamondAddress = ethers.constants.AddressZero
+  const tileDiamondAddress = ethers.constants.AddressZero
+  const fakeGotchiCardDiamondAddress = ethers.constants.AddressZero
 
   const childChainManager = "0xb5505a6d998549090530911180f38aC5130101c6"; // todo
   const linkAddress = "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"; // todo
@@ -253,7 +285,6 @@ async function deployAavegotchiContracts(ownerAddress: string) {
     ],
   });
 
-  let totalGasUsed = ethers.BigNumber.from("0");
   let tx;
   let receipt;
 
@@ -263,6 +294,10 @@ async function deployAavegotchiContracts(ownerAddress: string) {
   daoFacet = await ethers.getContractAt("DAOFacet", aavegotchiDiamond.address);
   shopFacet = await ethers.getContractAt(
     "ShopFacet",
+    aavegotchiDiamond.address
+  );
+  itemsFacet = await ethers.getContractAt(
+    "contracts/Aavegotchi/facets/ItemsFacet.sol:ItemsFacet",
     aavegotchiDiamond.address
   );
   aavegotchiFacet = await ethers.getContractAt(
@@ -279,6 +314,10 @@ async function deployAavegotchiContracts(ownerAddress: string) {
   );
   erc721MarketplaceFacet = await ethers.getContractAt(
     "ERC721MarketplaceFacet",
+    aavegotchiDiamond.address
+  );
+  peripheryFacet = await ethers.getContractAt(
+    "PeripheryFacet",
     aavegotchiDiamond.address
   );
   svgFacet = await ethers.getContractAt("SvgFacet", aavegotchiDiamond.address);
@@ -313,9 +352,151 @@ async function deployAavegotchiContracts(ownerAddress: string) {
     throw Error(`Error:: ${tx.hash}`);
   }
 
+  // add item types
+  const itemTypes = getAllItemTypes(allItemTypes, ethers);
+
+  let step = 20;
+  let sliceStep = itemTypes.length / step;
+  for (let i = 0; i < step; i++) {
+    tx = await daoFacet.addItemTypes(
+      itemTypes.slice(sliceStep * i, sliceStep * (i + 1)),
+      { gasLimit: gasLimit }
+    );
+    receipt = await tx.wait();
+    if (!receipt.status) {
+      throw Error(`Error:: ${tx.hash}`);
+    }
+  }
+
+  // add wearable types sets
+  console.log("Adding Wearable Sets");
+  step = 2;
+  sliceStep = wearableSets.length / step;
+  for (let i = 0; i < step; i++) {
+    tx = await daoFacet.addWearableSets(
+      wearableSets.slice(sliceStep * i, sliceStep * (i + 1)),
+      { gasLimit: gasLimit }
+    );
+    receipt = await tx.wait();
+    if (!receipt.status) {
+      throw Error(`Error:: ${tx.hash}`);
+    };
+  }
+
+
+
+
+
+
+  let forgeDiamondAddress = await deployAndUpgradeForgeDiamond(
+    diamondCutFacet.address,
+    diamondLoupeFacet.address,
+    ownershipFacet.address
+  );
+  await setForgeProperties(forgeDiamondAddress);
+  tx = await daoFacet.setForge(forgeDiamondAddress, { gasLimit: gasLimit });
+  receipt = await tx.wait();
+
+  // add erc721 and 1155 categories
+  console.log("Adding ERC721 categories");
+  const erc721Categories = [
+    {
+      erc721TokenAddress: realmDiamondAddress,
+      category: 4,
+    },
+    {
+      erc721TokenAddress: fakeGotchiArtDiamondAddress,
+      category: 5,
+    },
+  ];
+
+  tx = await erc721MarketplaceFacet.setERC721Categories(erc721Categories, {
+    gasLimit: gasLimit,
+  });
+  receipt = await tx.wait();
+  if (!receipt.status) {
+    throw Error(`Error:: ${tx.hash}`);
+  }
+
+  console.log("Adding ERC1155 categories");
+  const erc1155Categories = [];
+  for (let i = 0; i < 6; i++) {
+    erc1155Categories.push({
+      erc1155TokenAddress: ghstStakingDiamondAddress,
+      erc1155TypeId: i,
+      category: 3,
+    });
+  }
+  [
+    1, 141, 142, 143, 144, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155,
+    156,
+  ].forEach((id) => {
+    erc1155Categories.push({
+      erc1155TokenAddress: installationDiamondAddress,
+      erc1155TypeId: id,
+      category: 4,
+    });
+  });
+  Array.from({ length: 31 }, (_, index) => index + 1).forEach((id) => {
+    erc1155Categories.push({
+      erc1155TokenAddress: tileDiamondAddress,
+      erc1155TypeId: id,
+      category: 5,
+    });
+  });
+  erc1155Categories.push({
+    erc1155TokenAddress: fakeGotchiCardDiamondAddress,
+    erc1155TypeId: 0,
+    category: 6,
+  });
+
+  const offset = 1_000_000_000;
+  const alloyCategory = 7;
+  const geodesCategory = 9;
+  const essenceCategory = 10;
+  const coresCategory = 11;
+  const alloyIds = [offset];
+  const essenceIds = [offset + 1];
+  const geodeIds = []; //[offset + 2, offset +3, offset+4, offset+5, offset+6, offset+7];
+  for (let i = offset + 2; i < offset + 8; i++) {
+    geodeIds.push(i);
+  }
+  const coreIds = [];
+  for (let i = offset + 8; i < offset + 44; i++) {
+    coreIds.push(i);
+  }
+  const forgeFinalArray = [
+    [alloyCategory, alloyIds],
+    [geodesCategory, geodeIds],
+    [essenceCategory, essenceIds],
+    [coresCategory, coreIds],
+  ];
+  forgeFinalArray.forEach((el) => {
+    const category = el[0];
+    const toAdd = el[1] as number[];
+
+    for (let index = 0; index < toAdd.length; index++) {
+      erc1155Categories.push({
+        erc1155TokenAddress: forgeDiamondAddress,
+        erc1155TypeId: toAdd[index],
+        category: category,
+      });
+    }
+  });
+
+  tx = await erc1155MarketplaceFacet.setERC1155Categories(erc1155Categories, {
+    gasLimit: gasLimit,
+  });
+  receipt = await tx.wait();
+  if (!receipt.status) {
+    throw Error(`Error:: ${tx.hash}`);
+  }
+
   return {
     shopFacet,
     aavegotchiFacet,
-    polygonXGotchichainBridgeFacet
+    polygonXGotchichainBridgeFacet,
+    itemsFacet,
+    ghstToken: ghstTokenContract,
   }
 }
