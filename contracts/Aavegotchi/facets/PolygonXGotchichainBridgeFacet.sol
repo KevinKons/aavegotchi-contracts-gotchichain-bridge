@@ -16,6 +16,9 @@ contract PolygonXGotchichainBridgeFacet is Modifiers {
     function setAavegotchiMetadata(uint _id, Aavegotchi memory _aavegotchi) external onlyLayerZeroBridge {
         //todo @emit transfer event?
         s.aavegotchis[_id] = _aavegotchi;
+        s.tokenIds.push(uint32(_id));
+        s.ownerTokenIdIndexes[_aavegotchi.owner][_id] = s.ownerTokenIds[_aavegotchi.owner].length;
+        s.ownerTokenIds[_aavegotchi.owner].push(uint32(_id));
     }
 
     function setLayerZeroBridge(address _newLayerZeroBridge) external onlyDaoOrOwner {
@@ -24,5 +27,5 @@ contract PolygonXGotchichainBridgeFacet is Modifiers {
 
     function getAavegotchiData(uint256 _tokenId) external view returns (Aavegotchi memory aavegotchi_) {
         aavegotchi_ = s.aavegotchis[_tokenId];
-    }    
+    }
 }
