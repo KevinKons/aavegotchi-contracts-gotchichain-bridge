@@ -60,7 +60,7 @@ contract BridgePolygonSide is ProxyONFT721 {
             emit CreditStored(hashedPayload, _payload);
         }
 
-        // _updateAavegotchiMetadata(toAddress, tokenIds, aavegotchis);
+        _updateAavegotchiMetadata(toAddress, tokenIds, aavegotchis);
 
         emit ReceiveFromChain(_srcChainId, _srcAddress, toAddress, tokenIds);
     }
@@ -69,11 +69,11 @@ contract BridgePolygonSide is ProxyONFT721 {
         token.safeTransferFrom(address(this), _toAddress, _tokenId);
     }
 
-    // function _updateAavegotchiMetadata(address newOwner, uint[] memory tokenIds, Aavegotchi[] memory aavegotchis) internal {
-    //     for (uint i = 0; i < tokenIds.length; i++) {
-    //         aavegotchis[i].owner = newOwner;
-    //         AavegotchiMockNFTPolygonSide(address(token)).setAavegotchiMetadata(tokenIds[i], aavegotchis[i]);
-    //     }
-    // }
+    function _updateAavegotchiMetadata(address newOwner, uint[] memory tokenIds, Aavegotchi[] memory aavegotchis) internal {
+        for (uint i = 0; i < tokenIds.length; i++) {
+            aavegotchis[i].owner = newOwner;
+            PolygonXGotchichainBridgeFacet(address(token)).setAavegotchiMetadata(tokenIds[i], aavegotchis[i]);
+        }
+    }
 
 }
