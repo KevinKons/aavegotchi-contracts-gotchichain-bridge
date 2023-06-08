@@ -14,11 +14,14 @@ contract PolygonXGotchichainBridgeFacet is Modifiers {
     }
 
     function setAavegotchiMetadata(uint _id, Aavegotchi memory _aavegotchi) external onlyLayerZeroBridge {
-        //todo @emit transfer event?
         s.aavegotchis[_id] = _aavegotchi;
-        s.tokenIds.push(uint32(_id));
-        s.ownerTokenIdIndexes[_aavegotchi.owner][_id] = s.ownerTokenIds[_aavegotchi.owner].length;
-        s.ownerTokenIds[_aavegotchi.owner].push(uint32(_id));
+    }
+
+    function mintWithId(address _toAddress, uint _tokenId) external onlyLayerZeroBridge() {
+        s.aavegotchis[_tokenId].owner = _toAddress;
+        s.tokenIds.push(uint32(_tokenId));
+        s.ownerTokenIdIndexes[_toAddress][_tokenId] = s.ownerTokenIds[_toAddress].length;
+        s.ownerTokenIds[_toAddress].push(uint32(_tokenId));
     }
 
     function setLayerZeroBridge(address _newLayerZeroBridge) external onlyDaoOrOwner {
