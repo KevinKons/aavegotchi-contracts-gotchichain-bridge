@@ -67,7 +67,7 @@ describe("Bridge ERC721: ", function () {
     await bridgeFacetGotchichainSide.setLayerZeroBridge(bridgeGotchichainSide.address)
   })
 
-  it.skip("sendFrom() - send NFT from Polygon to Gotchichain", async function () {
+  it("sendFrom() - send NFT from Polygon to Gotchichain", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
@@ -97,7 +97,7 @@ describe("Bridge ERC721: ", function () {
     console.log({ aavegotchiData })
   })
 
-  it("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon", async function () {
+  it.skip("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
