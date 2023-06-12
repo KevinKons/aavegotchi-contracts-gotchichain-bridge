@@ -67,7 +67,7 @@ describe("Bridge ERC721: ", function () {
     await bridgeFacetGotchichainSide.setLayerZeroBridge(bridgeGotchichainSide.address)
   })
 
-  it.skip("sendFrom() - send NFT from Polygon to Gotchichain", async function () {
+  it.skip("sendFrom() - send NFT from Polygon to Gotchichain - without attached item", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
@@ -97,14 +97,13 @@ describe("Bridge ERC721: ", function () {
     console.log({ aavegotchiData })
   })
 
-  it("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon", async function () {
+  it.skip("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon - without attached item", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
     let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
 
     //Swaps token to other chain
-    console.log("Sending token to Gotchichain")
     await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
     let sendFromTx = await bridgePolygonSide.sendFrom(
       owner.address,
@@ -120,12 +119,6 @@ describe("Bridge ERC721: ", function () {
 
     expect(await aavegotchiFacetPolygonSide.ownerOf(tokenId)).to.equal(bridgePolygonSide.address)
     expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.be.equal(owner.address)
-
-    console.log('Buying items on gotchichain side')
-    // await ghstTokenGotchichainSide.mint(owner.address, ethers.utils.parseEther('100000000000000000000000'))
-    // await ghstTokenGotchichainSide.approve(shopFacetGotchichainSide.address, ethers.utils.parseEther('100000000000000000000000'))
-    // await shopFacetGotchichainSide.purchaseItemsWithGhst(owner.address, [2], [1])
-    // await itemsFacetGotchichainSide.equipWearables(0, [2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     await aavegotchiFacetGotchichainSide.approve(bridgeGotchichainSide.address, tokenId)
     
@@ -151,22 +144,67 @@ describe("Bridge ERC721: ", function () {
     console.log({ aavegotchiData })
   })
 
+  it("sendFrom() - send NFT from Polygon to Gotchichain - with attached item", async function () {
+    const tokenId = await mintPortalsWithItems(owner.address)
+
+    //Estimate nativeFees
+    let nativeFee = (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee
+
+    //Swaping token to Gotchichain
+    await aavegotchiFacetPolygonSide.approve(bridgePolygonSide.address, tokenId)
+    let sendFromTx = await bridgePolygonSide.sendFrom(
+      owner.address,
+      chainId_B,
+      owner.address,
+      tokenId,
+      owner.address,
+      ethers.constants.AddressZero,
+      defaultAdapterParams,
+      { value: nativeFee }
+    )
+    await sendFromTx.wait()
+
+    //Checking Aavegotchi ownership in both chains
+    expect(await aavegotchiFacetPolygonSide.ownerOf(tokenId)).to.equal(bridgePolygonSide.address)
+    expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.be.equal(owner.address)
+
+    //Checking items balance before unequipping them
+    expect((await itemsFacetGotchichainSide.itemBalances(owner.address)).length).to.be.equal(0)
+    
+    //Unequipping items
+    await itemsFacetGotchichainSide.equipWearables(tokenId, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    
+    //Checking items balance after unequipping them
+    expect((await itemsFacetGotchichainSide.itemBalancesWithTypes(owner.address))[0].itemId).to.be.equal(ethers.BigNumber.from(1))
+    expect((await itemsFacetGotchichainSide.itemBalancesWithTypes(owner.address))[0].balance).to.be.equal(ethers.BigNumber.from(1))
+
+    //Checking equipped items
+    expect(await itemsFacetGotchichainSide.equippedWearables(tokenId)).to.eql([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+    const aavegotchiData = await bridgeFacetGotchichainSide.getAavegotchiData(tokenId)
+    console.log({ aavegotchiData })
+  })
+
   async function mintPortals(to: string) {
     let tx = await shopFacetPolygonSide.mintPortals(to, 1)
     let receipt: any = await tx.wait()
 
-    const tokenId = receipt.events[0].args._tokenId.toString()
+    return receipt.events[0].args._tokenId.toString()
+  }
 
-    // tx = await ghstTokenPolygonSide.mint(owner.address, ethers.utils.parseEther('100000000000000000000000'))
-    // await tx.wait()
+  async function mintPortalsWithItems(to: string) {
+    const tokenId = mintPortals(to)
 
-    // tx = await ghstTokenPolygonSide.approve(shopFacetPolygonSide.address, ethers.utils.parseEther('100000000000000000000000'))
+    let tx = await ghstTokenPolygonSide.mint(owner.address, ethers.utils.parseEther('100000000000000000000000'))
+    await tx.wait()
 
-    // tx = await shopFacetPolygonSide.purchaseItemsWithGhst(owner.address, [1], [1])
-    // await tx.wait()
+    tx = await ghstTokenPolygonSide.approve(shopFacetPolygonSide.address, ethers.utils.parseEther('100000000000000000000000'))
 
-    // tx = await itemsFacetPolygonSide.equipWearables(0, [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    // await tx.wait()
+    tx = await shopFacetPolygonSide.purchaseItemsWithGhst(owner.address, [1], [1])
+    await tx.wait()
+
+    tx = await itemsFacetPolygonSide.equipWearables(0, [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    await tx.wait()
 
     return tokenId
   }
@@ -174,7 +212,6 @@ describe("Bridge ERC721: ", function () {
 
 
 async function deployAavegotchiContracts(ownerAddress: string) {
-
   const name = "Aavegotchi";
   const symbol = "GOTCHI";
 
