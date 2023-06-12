@@ -8,7 +8,6 @@ import {LibItems} from "../libraries/LibItems.sol";
 contract PolygonXGotchichainBridgeFacet is Modifiers {
 
     address public layerZeroBridge;
-    address public itemsFacetAddress;
 
     modifier onlyLayerZeroBridge() {
         require(msg.sender == layerZeroBridge, "PolygonXGotchichainBridgeFacet: Do not have access");
@@ -34,10 +33,6 @@ contract PolygonXGotchichainBridgeFacet is Modifiers {
 
     function setLayerZeroBridge(address _newLayerZeroBridge) external onlyDaoOrOwner {
         layerZeroBridge = _newLayerZeroBridge;
-    }
-
-    function setItemsFacetAddress(address _itemsFacetAddress) external onlyDaoOrOwner {
-        itemsFacetAddress = _itemsFacetAddress;
     }
 
     function getAavegotchiData(uint256 _tokenId) external view returns (Aavegotchi memory aavegotchi_) {
