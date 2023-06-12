@@ -14,9 +14,9 @@ import { setForgeProperties } from "../scripts/upgrades/forge/upgrade-forgeSette
 describe("Bridge ERC721: ", function () {
   const chainId_A = 1
   const chainId_B = 2
-  const minGasToStore = 200000
+  const minGasToStore = 100000
   const batchSizeLimit = 1
-  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, 350000])
+  const defaultAdapterParams = ethers.utils.solidityPack(["uint16", "uint256"], [1, "350000"])
 
   let LZEndpointMock: any, bridgePolygonSide: BridgePolygonSide, bridgeGotchichainSide: BridgeGotchichainSide
   let owner: SignerWithAddress, alice: SignerWithAddress
@@ -67,7 +67,7 @@ describe("Bridge ERC721: ", function () {
     await bridgeFacetGotchichainSide.setLayerZeroBridge(bridgeGotchichainSide.address)
   })
 
-  it("sendFrom() - send NFT from Polygon to Gotchichain", async function () {
+  it.skip("sendFrom() - send NFT from Polygon to Gotchichain", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
@@ -97,7 +97,7 @@ describe("Bridge ERC721: ", function () {
     console.log({ aavegotchiData })
   })
 
-  it.skip("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon", async function () {
+  it("sendFrom() - send NFT from Polygon to Gotchichain and back to Polygon", async function () {
     const tokenId = await mintPortals(owner.address)
 
     //Estimate nativeFees
@@ -118,15 +118,18 @@ describe("Bridge ERC721: ", function () {
     )
     await sendFromTx.wait()
 
+    expect(await aavegotchiFacetPolygonSide.ownerOf(tokenId)).to.equal(bridgePolygonSide.address)
+    expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.be.equal(owner.address)
+
     console.log('Buying items on gotchichain side')
     // await ghstTokenGotchichainSide.mint(owner.address, ethers.utils.parseEther('100000000000000000000000'))
     // await ghstTokenGotchichainSide.approve(shopFacetGotchichainSide.address, ethers.utils.parseEther('100000000000000000000000'))
     // await shopFacetGotchichainSide.purchaseItemsWithGhst(owner.address, [2], [1])
     // await itemsFacetGotchichainSide.equipWearables(0, [2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-    console.log('Swapping token back to Polygon')
     await aavegotchiFacetGotchichainSide.approve(bridgeGotchichainSide.address, tokenId)
-
+    
+    //Swapping token back to Polygon
     sendFromTx = await bridgeGotchichainSide.sendFrom(
       owner.address,
       chainId_A,
@@ -135,21 +138,13 @@ describe("Bridge ERC721: ", function () {
       owner.address,
       ethers.constants.AddressZero,
       defaultAdapterParams,
-      { value: (await bridgePolygonSide.estimateSendFee(chainId_B, owner.address, tokenId, false, defaultAdapterParams)).nativeFee }
+      { value: (await bridgeGotchichainSide.estimateSendFee(chainId_A, owner.address, tokenId, false, defaultAdapterParams)).nativeFee }
     )
     await sendFromTx.wait()
 
     //Token is now owned by the proxy contract on origin chain
-    console.log("Token is now owned by the proxy contract on origin chain")
-
-    console.log('await aavegotchiFacetGotchichainSide.ownerOf(tokenId)', await aavegotchiFacetGotchichainSide.ownerOf(tokenId))
-    console.log('bridgeGotchichainSide.address', bridgeGotchichainSide.address)
     expect(await aavegotchiFacetGotchichainSide.ownerOf(tokenId)).to.equal(bridgeGotchichainSide.address)
-    
     //Token received on the dst chain
-    console.log("Token received on the dst chain")
-    console.log('aavegotchiFacetPolygonSide.ownerOf(tokenId)', await aavegotchiFacetPolygonSide.ownerOf(tokenId))
-    console.log('owner.address', owner.address)
     expect(await aavegotchiFacetPolygonSide.ownerOf(tokenId)).to.be.equal(owner.address)
 
     const aavegotchiData = await bridgeFacetGotchichainSide.getAavegotchiData(tokenId)
