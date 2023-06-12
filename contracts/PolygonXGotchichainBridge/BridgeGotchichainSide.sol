@@ -70,7 +70,7 @@ contract BridgeGotchichainSide is ProxyONFT721 {
         try token.ownerOf(_tokenId) {
             token.safeTransferFrom(address(this), _toAddress, _tokenId);
         } catch Error(string memory reason) {
-            if (_compare(reason, "ERC721: invalid token ID")) {
+            if (_compare(reason, "AavegotchiFacet: invalid _tokenId")) {
                 PolygonXGotchichainBridgeFacet(address(token)).mintWithId(_toAddress, _tokenId);
             }
             // @todo: what to do?
